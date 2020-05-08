@@ -4,8 +4,10 @@ import (
 	"../../utils"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/xtaci/kcptun/generic"
@@ -21,7 +23,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"flag"
 )
 
 func writeStdin(w *websocket.Conn, content string) {
@@ -87,7 +88,7 @@ func websocketWriter(ch <-chan uint8, conn *websocket.Conn) {
 			}
 		}
 		if buf.Len() != 0 {
-			writeStdin(conn, buf.String() + "\r")
+			writeStdin(conn, buf.String()+"\r")
 			buf.Reset()
 		}
 	}
@@ -140,7 +141,7 @@ func setupCloseHandler(mux *smux.Session) {
 }
 
 type mappingConfig struct {
-	localPort uint16
+	localPort  uint16
 	remoteAddr string
 	remotePort uint16
 }
@@ -249,8 +250,9 @@ func main() {
 	flag.Parse()
 	configs := processConfigs(flag.Args())
 
-	u := url.URL{Scheme: "ws", Host: "course.educg.net:7001", Path: fmt.Sprintf("/%s/terminals/websocket/1", educg_id)}
+	u := url.URL{Scheme: "wss", Host: "course.educg.net", Path: fmt.Sprintf("/%s/terminals/websocket/1", educg_id)}
 
+	websocket.DefaultDialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	log.Print("正在连接...")
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
@@ -268,7 +270,7 @@ func main() {
 
 	log.Print("正在同步终端状态...")
 
-	writeCmd := func (str string) {
+	writeCmd := func(str string) {
 		for _, b := range str {
 			uplinkChannel <- uint8(b)
 		}
